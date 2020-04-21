@@ -5,58 +5,57 @@ import ms from 'ms';
 import API from '../services/API';
 
 export default function Home() {
-  const [showcaseIds, setShowcaseIds] = useState([]);
+  const [showcaseData, setShowcaseData] = useState([]);
   const [list, setList] = useState([]);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [loadMore, setLoadMore] = useState(true);
   const limit = 10;
 
   useEffect(() => {
     setLoading(true);
-    API.getShowStories()
-      .then((dataList) => {
-        const promises = dataList.slice(0, 10).map((item) => {
+    let listData = [...list];
+    API.getShowStories(index, limit)
+      .then((response) => {
+        listData = [...listData, ...response.devTo];
+        const promises = response.hnews.map((item) => {
           return API.getItemDetails(item);
         });
-        setShowcaseIds(dataList);
+        setShowcaseData(response);
         return Promise.all(promises);
       })
-      .then((data) => {
-        setList(data);
+      .then((response) => {
+        const mappedSource = response.map((item) => {
+          item.showcaseSource = 'HACKERNEWS';
+          return item;
+        });
+        listData = [...listData, ...mappedSource];
+        setList(listData);
         setLoading(false);
       });
-  }, []);
-
-  useEffect(() => {
-    if (list.length === showcaseIds.length) {
-      return setLoadMore(false);
-    }
-    return setLoadMore(true);
-  }, [list, showcaseIds]);
+  }, [index]);
 
   const paginate = () => {
-    const nextIndex = index + 1;
-    setLoading(true);
-    const offset = nextIndex * limit;
-    const promises = showcaseIds.slice(offset, offset + limit).map((item) => {
-      return API.getItemDetails(item);
-    });
-
-    return Promise.all(promises).then((data) => {
-      setIndex(nextIndex);
-      setList([...list, ...data]);
-      setLoading(false);
-    });
+    setIndex(index + 1);
   };
 
-  const getTime = (time) => {
-    if (isNaN(time) || !time) {
-      return '-';
+  const getTime = (listItem) => {
+    let time;
+    if (listItem.published_at) {
+      time = new Date(listItem.published_at);
     }
-    const timeAsDate = new Date(time * 1000).getTime();
+    if (listItem.time) {
+      time = new Date(listItem.time * 1000);
+    }
+    if (!time) {
+      return;
+    }
+    const timeInMills = new Date(time).getTime();
     const timeNow = Date.now();
-    return ms(timeNow - timeAsDate);
+    return ms(timeNow - timeInMills);
+  };
+
+  const getSource = (listItem) => {
+    return listItem.showcaseSource || '-';
   };
 
   return (
@@ -76,19 +75,18 @@ export default function Home() {
             <a target="_blank" href={listItem.url} className="card">
               <h3>{listItem.title}</h3>
               <p dangerouslySetInnerHTML={{ __html: listItem.text }}></p>
-              <small>{getTime(listItem.time)}</small>
+              <small>Posted: {getTime(listItem)}</small>
+              <div className="spacer"></div>
+              <small>Source: {getSource(listItem)}</small>
             </a>
           ))}
         </div>
         <div className="grid">
           {loading ? <p>loading...</p> : null}
-          {!loading && loadMore ? (
+          {!loading ? (
             <button className="button" onClick={paginate}>
               Load More
             </button>
-          ) : null}
-          {list.length === showcaseIds.length ? (
-            <h3>That's all folks</h3>
           ) : null}
         </div>
       </main>
@@ -227,6 +225,11 @@ export default function Home() {
           background: white;
           border: 1px solid black;
           color: black;
+        }
+
+        .spacer {
+          width: 10px;
+          display: inline-block;
         }
 
         @media (max-width: 600px) {
