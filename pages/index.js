@@ -1,62 +1,97 @@
-import Head from 'next/head'
+import Head from 'next/head';
+import { useState, useEffect } from 'react';
+import ms from 'ms';
+
+import API from '../services/API';
 
 export default function Home() {
+  const [showcaseIds, setShowcaseIds] = useState([]);
+  const [list, setList] = useState([]);
+  const [index, setIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadMore, setLoadMore] = useState(true);
+  const limit = 10;
+
+  useEffect(() => {
+    setLoading(true);
+    API.getShowStories()
+      .then((dataList) => {
+        const promises = dataList.slice(0, 10).map((item) => {
+          return API.getItemDetails(item);
+        });
+        setShowcaseIds(dataList);
+        return Promise.all(promises);
+      })
+      .then((data) => {
+        setList(data);
+        setLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (list.length === showcaseIds.length) {
+      return setLoadMore(false);
+    }
+    return setLoadMore(true);
+  }, [list, showcaseIds]);
+
+  const paginate = () => {
+    const nextIndex = index + 1;
+    setLoading(true);
+    const offset = nextIndex * limit;
+    const promises = showcaseIds.slice(offset, offset + limit).map((item) => {
+      return API.getItemDetails(item);
+    });
+
+    return Promise.all(promises).then((data) => {
+      setIndex(nextIndex);
+      setList([...list, ...data]);
+      setLoading(false);
+    });
+  };
+
+  const getTime = (time) => {
+    if (isNaN(time) || !time) {
+      return '-';
+    }
+    const timeAsDate = new Date(time * 1000).getTime();
+    const timeNow = Date.now();
+    return ms(timeNow - timeAsDate);
+  };
+
   return (
     <div className="container">
       <Head>
-        <title>Create Next App</title>
-        <link rel="icon" href="/favicon.ico" />
+        <title>ShowCase</title>
+        <link rel="shortcut-icon" href="/favicon.ico" />
       </Head>
 
       <main>
         <h1 className="title">
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
+          Welcome to <a href="https://showcase.barelyhuman.dev">ShowCase</a>
         </h1>
 
-        <p className="description">
-          Get started by editing <code>pages/index.js</code>
-        </p>
-
         <div className="grid">
-          <a href="https://nextjs.org/docs" className="card">
-            <h3>Documentation &rarr;</h3>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className="card">
-            <h3>Learn &rarr;</h3>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/zeit/next.js/tree/master/examples"
-            className="card"
-          >
-            <h3>Examples &rarr;</h3>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://zeit.co/import?filter=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className="card"
-          >
-            <h3>Deploy &rarr;</h3>
-            <p>
-              Instantly deploy your Next.js site to a public URL with ZEIT Now.
-            </p>
-          </a>
+          {list.map((listItem) => (
+            <a target="_blank" href={listItem.url} className="card">
+              <h3>{listItem.title}</h3>
+              <p dangerouslySetInnerHTML={{ __html: listItem.text }}></p>
+              <small>{getTime(listItem.time)}</small>
+            </a>
+          ))}
+        </div>
+        <div className="grid">
+          {loading ? <p>loading...</p> : null}
+          {!loading && loadMore ? (
+            <button className="button" onClick={paginate}>
+              Load More
+            </button>
+          ) : null}
+          {list.length === showcaseIds.length ? (
+            <h3>That's all folks</h3>
+          ) : null}
         </div>
       </main>
-
-      <footer>
-        <a
-          href="https://zeit.co?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by <img src="/zeit.svg" alt="ZEIT Logo" />
-        </a>
-      </footer>
 
       <style jsx>{`
         .container {
@@ -73,25 +108,6 @@ export default function Home() {
           flex: 1;
           display: flex;
           flex-direction: column;
-          justify-content: center;
-          align-items: center;
-        }
-
-        footer {
-          width: 100%;
-          height: 100px;
-          border-top: 1px solid #eaeaea;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-
-        footer img {
-          margin-left: 0.5rem;
-        }
-
-        footer a {
-          display: flex;
           justify-content: center;
           align-items: center;
         }
@@ -143,11 +159,12 @@ export default function Home() {
           justify-content: center;
           flex-wrap: wrap;
 
-          max-width: 800px;
+          max-width: 1000px;
           margin-top: 3rem;
         }
 
         .card {
+          min-width: 100%;
           margin: 1rem;
           flex-basis: 45%;
           padding: 1.5rem;
@@ -177,6 +194,41 @@ export default function Home() {
           line-height: 1.5;
         }
 
+        .button {
+          -webkit-appearance: none;
+          position: relative;
+          display: inline-block;
+          vertical-align: middle;
+          text-transform: uppercase;
+          text-align: center;
+          line-height: 28px;
+          white-space: nowrap;
+          min-width: 135px;
+          height: 28px;
+          font-weight: 500;
+          font-size: 12px;
+          flex-shrink: 0;
+          color: rgb(255, 255, 255);
+          background-color: rgb(37, 41, 46);
+          user-select: none;
+          cursor: pointer;
+          text-decoration: none;
+          padding: 0px 25px;
+          border-radius: 5px;
+          border-width: 1px;
+          border-style: solid;
+          border-color: rgb(37, 41, 46);
+          border-image: initial;
+          transition: all 0.2s ease 0s;
+          overflow: hidden;
+          outline: none;
+        }
+        .button:hover {
+          background: white;
+          border: 1px solid black;
+          color: black;
+        }
+
         @media (max-width: 600px) {
           .grid {
             width: 100%;
@@ -200,5 +252,5 @@ export default function Home() {
         }
       `}</style>
     </div>
-  )
+  );
 }
