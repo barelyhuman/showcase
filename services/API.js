@@ -13,9 +13,9 @@ controller.getShowStories = (offset, limit) => {
   const DevToData = DevToApi.get(
     `/articles?tag=showdev&page=${offset + 1}&${limit}`
   ).then((data) => data.data);
-  const HNData = HackerNewsAPI.get(
-    '/showstories.json?print=pretty'
-  ).then((data) => data.data.slice(offset, limit));
+  const HNData = HackerNewsAPI.get('/showstories.json?print=pretty').then(
+    (data) => data.data.slice(offset, limit)
+  );
 
   return Promise.all([DevToData, HNData]).then((response) => {
     return {
